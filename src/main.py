@@ -7,12 +7,16 @@ import numpy as np
 from PIL import Image
 import filetype
 import cv2 as cv
+from matplotlib import pyplot as plt
+
+from star_detection import *
 
 #################
 # Global variables
 #################
 
 SUPPORTED_FORMATS = ["jpg", "jpeg", "png", "tiff", "nef"]
+KEYPOINT_SENSETIVITY = 20
 
 #################
 # Classes
@@ -24,17 +28,26 @@ class Astropic():
         self.type = type
 
         self.image = Image.open(path)
-        self.array = np.asarray(self.image)
-        self.cv = cv.imread(path, cv.IMREAD_GRAYSCALE)
+
+        self.colour_array = cv.imread(path, cv.IMREAD_COLOR)
+        self.grayscale_array = cv.imread(path, cv.IMREAD_GRAYSCALE)
 
         self.resolution = self.image.height * self.image.width
 
-        self.features = []
-
     def detect_features(self):
-        orb = cv.ORB_create(nfeatures=10)
-        keypoints, descriptor = orb.detectAndCompute(self.cv, None)
-        self.features = [keypoints, descriptor]
+        pass
+
+    def detect_stars(self, threshold, method):
+        """Detects stars in an image
+        
+        Return:
+            starmap (array): Array image of stars with each star assigned an index.
+            stars (array): Array of all stars above the brightness threshold in image.
+        """
+        if method == 0:
+            blob_detect()
+        elif method == 1:
+            weave_extract_deprecated()
 
 #################
 # Functions
@@ -92,7 +105,7 @@ def average(pics, output):
     avg_array = np.zeros((pics[0].image.height, pics[0].image.width, 3))
 
     for image in pics:
-        avg_array += image.array
+        avg_array += image.colour_array
 
     avg_array /= pic_count
 
@@ -105,10 +118,15 @@ def average(pics, output):
 #################
 
 if __name__ == "__main__":
-    images_dir = sys.argv[1]
+    # images_dir = sys.argv[1]
     # output = sys.argv[2]
     # Image.open(average(get_images(images_dir), output)).show()
 
     pic = Astropic(sys.argv[1])
-    pic.detect_features()
-    print(pic.features[0])
+    pic.image.show()
+
+    #ret, binary_img_global = cv.threshold(pic.cv, 240, 255, cv.THRESH_BINARY)
+    ids = blob_detect(pic.grayscale_array)
+
+    x = Image.fromarray(ids)
+    x.show()
