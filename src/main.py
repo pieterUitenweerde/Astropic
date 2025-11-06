@@ -119,14 +119,10 @@ def average(pics, output):
 
 if __name__ == "__main__":
     # images_dir = sys.argv[1]
-    # output = sys.argv[2]
-    # Image.open(average(get_images(images_dir), output)).show()
 
     pic = Astropic(sys.argv[1])
-    pic.image.show()
 
-    #ret, binary_img_global = cv.threshold(pic.cv, 240, 255, cv.THRESH_BINARY)
-    ids = blob_detect(pic.grayscale_array)
+    ids = colorize_starmap(blob_detect(pic.grayscale_array))
 
     x = Image.fromarray(ids)
     x.show()
