@@ -1,108 +1,176 @@
 """Outputs the coordinates of stars above a brightness threshold in an image."""
 
 import numpy as np
-from PIL import Image
 
 #################
 # Global variables
 #################
+
 WHITE = 255
 
-IMAGE = [[0,0,1,0,1],
-         [0,0,1,0,0],
-         [0,0,1,0,1],
-         ]
+#################
+# Classes
+#################
 
+class DetectedStars:
+    """
+    Class containing data of stars detected in an image.
+
+    Variables:
+        ID_map: A 2D array of the image with IDs assigned to all pixels belonging to stars.
+        coord_map: A 3D array storing the center points of all stars.
+        coords: The coordinates of stars in the image. 
+        star_table: A dict listing all the detected stars and their associated pixels.
+    """
+    def __init__(self, ID_map, coord_map, coords, star_table):
+        self.ID_map = ID_map # Grayscale image indexing all stars
+        self.coord_map = coord_map # Binary image showing center point of stars
+        self.coords = coords # List of star coordinates
+        self.star_table = star_table # table of star IDs and associated pixels
+    
 #################
 # Functions
 #################
 
 def blob_detect(image_array):
-    """Blob detection algorithm"""
+    """
+    Blob detection algorithm for finding stars in an image.
 
+    Args:
+        image_array (np.array): 2D array representing a grayscale image.
+
+    Returns:
+        DetectedStars: Object containing an ID_map, coord_map, and a list of all star center points.
+    """
     def update_equivalence(table, key, value, new_object=False):
         """
         Checks the equivalense dict to find the lowest ID associated with an object
         and updates the dict accordingly
         """
+        key = int(key)
+        value = int(value)
+
         # if not new_object:
         try:
-            if table[value] < value:
+            # If the previous dict entry has an equivalence value
+            if table[value] < value: 
                 table[key] = table[value]
-            else:
+            # Otherwise use the given values
+            else: 
                 table.update({key:value})
         except KeyError:
             table.update({key:value})
 
+
     height = len(image_array)
     width = len(image_array[1])
 
-    blobs = np.zeros((height, width), np.uint32) # Array to store the pixel IDs
-    equivalence = {1:1} # Dictionary to store equivalent pixel IDs
-    count = 0 # Object iterator
-    object_count = 0 # Real count
+    pixel_id_map = np.zeros((height, width), np.uint32) # Array to store the pixel IDs
+    star_coords_map = np.zeros((height, width, 2), np.uint32) # Map to store star coords
+    equivalence = {} # Dictionary to store equivalent pixel IDs
+    count = 0 # Count of pixels without neighbours
+    object_count = 0 # Object count
+    equivalence_count = 0 # Number of items added to equivalence table
 
     # Raster scan binary image to check for objects
-    for h in range(height):
-        for w in range(width):
+    for y in range(height):
+        for x in range(width):
             # Get pixel
-            pixel = image_array[h][w]
+            pixel = image_array[y][x]
 
             # Check if the pixel is part of an object
             if pixel == WHITE:
                 # If object get neighbours
-                blob_neighbours = [0, 0] # [left, top]
-                if h > 0:
-                    blob_neighbours[1] = blobs[h-1][w] # Top neighbour
-                if w > 0:
-                    blob_neighbours[0] = blobs[h][w-1] # Left neighbour
-                #--------------
+                pixel_neighbours = [0, 0] # [left, top]
+                if y > 0:
+                    pixel_neighbours[1] = pixel_id_map[y-1][x] # Top neighbour
+                if x > 0:
+                    pixel_neighbours[0] = pixel_id_map[y][x-1] # Left neighbour
 
                 # The lowest ID in the neighbours set
                 lowest = 0
                 # Check for neighbour
                 for i in range(2):
-                    if blob_neighbours[i] > 0: # If neighbour is object
+                    if pixel_neighbours[i] > 0: # If neighbour is object
                         # Set current neighbour as lowest if lowest isn't set yet or it is the lowest ID found
-                        if lowest == 0 or blob_neighbours[i] < lowest: 
-                            lowest = blob_neighbours[i]
+                        if lowest == 0 or pixel_neighbours[i] < lowest: 
+                            lowest = pixel_neighbours[i]
                             lowest_index = i
                 
                 # If a neighbour was found
                 if lowest != 0:
-                    blobs[h][w] = lowest
+                    pixel_id_map[y][x] = lowest
                     # If a neighbour has a value lower than the object count, update equivalence table
                     # If there is a higher and lower ID in neighbours set
-                    highest = blob_neighbours[1 - lowest_index]
+                    if pixel_neighbours[1 - lowest_index] > 0:
+                        highest = pixel_neighbours[1 - lowest_index]
+                        update_equivalence(equivalence, highest, lowest)
 
-                    if blob_neighbours[lowest_index] < highest:
-                        update_equivalence(equivalence, highest, int(lowest))
-                        object_count = lowest
-                
-
+                        if highest > equivalence_count:
+                            equivalence_count = highest
                 # If no neighbours
                 else:
                     object_count += 1
                     count += 1
-                    blobs[h][w] = count
-                    equivalence.update({count: int(object_count)})
+                    pixel_id_map[y][x] = count
+                    equivalence.update({int(count): int(object_count)})
 
-    print()
-    print(blobs)
-    print()
-    print(equivalence)
+                    if count > equivalence_count:
+                        equivalence_count = count
+    
+    # Go through the equivalence table to find how many unique objects are present.
+    # Re-use object count iterator
+    object_count = 0
+    # Take note of IDs that have already been counted
+    unique_IDs = []
+    # Create dict containing items that should be updated in equivelance to ID objects sequentially.
+    update_IDs = {}
 
-    # Homogenize objects
-    for h in range(height):
-        for w in range(width):
-            blob_pixel = blobs[h][w]
+    # Count unique objects and take note of IDs that should be changed.
+    for key, value in equivalence.items():
+        if value not in unique_IDs:
+            unique_IDs.append(value)
+            object_count += 1
+            update_IDs.update({key: object_count})
+
+    # Update IDs
+    for key, value in update_IDs.items():
+        for i in equivalence:
+            if equivalence[i] == key:
+                equivalence[i] = value
+
+    # Create a table containing star IDs as keys and lists for pixels of the star as values.
+    star_table = {i: [] for i in range(1, object_count + 1)}
+
+    # Homogenize objects and add coords of stars to star table
+    for y in range(height):
+        for x in range(width):
+            blob_pixel = pixel_id_map[y][x]
             # If object
             if blob_pixel > 0:
-                blobs[h][w] = equivalence[blob_pixel]
-    
-    print()
-    print(blobs)
-    return(blobs)
+                pixel_id_map[y][x] = equivalence[blob_pixel]
+                # Add pixel to the star table
+                star_table[equivalence[blob_pixel]].append([y, x])
+
+    # Generate list of center points
+    star_coords = []
+    for key, value in star_table.items():
+        pixel_count = len(value)
+        sum_y = 0
+        sum_x = 0
+
+        for i in range(pixel_count):
+            sum_y += value[i][0]
+            sum_x += value[i][1]
+
+        # Add the coordinates of the star, as well as the number of pixels to a list
+        star_coord = [sum_y / pixel_count, sum_x/pixel_count]
+        # Add star coordinate to the coords map
+        star_coords_map[round(star_coord[0])][round(star_coord[1])] = star_coord
+        # add coordinate to coordinates list
+        star_coords.append(star_coord)
+
+    return DetectedStars(pixel_id_map, star_coords_map, star_coords, star_table)
 
 
 def weave_extract_deprecated(image_array, threshold=1):
@@ -114,7 +182,7 @@ def weave_extract_deprecated(image_array, threshold=1):
             # Check if current pixel is >= threshold
             if image_array[y][x] >= threshold:
                 blnk_n = 0
-                star_list.append([y, x])
+                star.append([y, x])
 
                 # Step to the side
                 list_star_recurse(y, x + direction, direction=direction, blnk=blnk_n)
@@ -162,11 +230,28 @@ def weave_extract_deprecated(image_array, threshold=1):
     for y, row in enumerate(image_array):
         for x, pixel in enumerate(row):
             if pixel >= threshold:
-                if not [y, x] in star_list:
+                star = []
+                if not [y, x] in star:
                     list_star_recurse(y, x, direction=1, blnk=0)
+                star_list.append(star)
     
-    return star_list
+    star_coords = []
+    for star in star_list:
+        center = [0, 0]
+        pixel_count = len(star)
+        sum_y = 0
+        sum_x = 0
 
+        for i in range(pixel_count):
+            sum_y += star[i][0]
+            sum_x += star[i][1]
+
+        center = [sum_y / pixel_count, sum_x/pixel_count]
+        star_coords.append(center)
+
+    return star_coords
+
+##### Debug functions ####
 
 def colorize_starmap(labelmap: np.ndarray, seed: int = None):
     """Convert a 2D array of object indices into a bright random RGB image."""
@@ -193,10 +278,19 @@ def colorize_starmap(labelmap: np.ndarray, seed: int = None):
 
     return rgb
 
+
+def plot_centers(coords, image):
+    for coord in coords:
+        i = 5
+        for y in range(i):
+            y -= 2
+            for x in range(i):
+                x -= 2
+                image[int(round(coord[0]-y))][int(round(coord[1]-x))] = [255, 0, 0]
+
 #################
 # Main
 #################
 
 if __name__ == "__main__":
-    print(blob_detect(IMAGE))
-    # print(weave_extract_deprecated(IMAGE))
+    print(weave_extract_deprecated(IMAGE))

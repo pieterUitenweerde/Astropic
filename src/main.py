@@ -6,10 +6,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 import filetype
-import cv2 as cv
+import cv2 as cv2
 from matplotlib import pyplot as plt
 
 from star_detection import *
+from star_identification import *
 
 #################
 # Global variables
@@ -29,25 +30,49 @@ class Astropic():
 
         self.image = Image.open(path)
 
-        self.colour_array = cv.imread(path, cv.IMREAD_COLOR)
-        self.grayscale_array = cv.imread(path, cv.IMREAD_GRAYSCALE)
+        self.colour_array = cv2.imread(path, cv2.IMREAD_COLOR)
+        self.grayscale_array = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
-        self.resolution = self.image.height * self.image.width
+        self.height = self.image.height
+        self.width = self.image.width
+        self.resolution = self.height * self.width
 
-    def detect_features(self):
-        pass
+        self.detected_stars = None
+        self.stars_colorized = None
 
-    def detect_stars(self, threshold, method):
+        # Star identification
+        self.identified_stars = [] # List of star objects 
+
+    def detect_stars(self, threshold):
         """Detects stars in an image
-        
         Return:
-            starmap (array): Array image of stars with each star assigned an index.
-            stars (array): Array of all stars above the brightness threshold in image.
+            Stars object:
+                    ID_map: A 2D array of the image with IDs assigned to all pixels belonging to stars.
+                    coord_map: A 3D array storing the center points of all stars.
+                    coords: The coordinates of stars in the image. 
+                    star_table: A dict listing all the detected stars and their associated pixels.
+            Colorized image (np.array)
         """
-        if method == 0:
-            blob_detect()
-        elif method == 1:
-            weave_extract_deprecated()
+        binary = cv2.threshold(self.grayscale_array, threshold, 255, type=cv2.THRESH_BINARY)[1]
+        self.detected_stars = blob_detect(binary)
+
+    def colorize_stars(self):
+        """Generates a colorized star_IDs image"""
+        self.stars_colorized = colorize_starmap(self.detected_stars.ID_map)
+
+    def identify_stars(self, radius):
+        """Gives identifiers to stars
+        
+        Returns:
+            identified_stars(list[Star])
+        """
+        stars = []
+        for star in self.detected_stars.coords:
+            ID = neighbour_based_id(star, self, radius)
+            if ID:
+                stars.append(ID)
+        self.identified_stars = stars
+
 
 #################
 # Functions
@@ -62,7 +87,6 @@ def get_images(path, type="light"):
     Return:
         list[path]: List of absolute path objects to images.
     """
-
     # Convert input to path object
     try:
         path = Path(path)
@@ -118,11 +142,24 @@ def average(pics, output):
 #################
 
 if __name__ == "__main__":
-    # images_dir = sys.argv[1]
-
     pic = Astropic(sys.argv[1])
+    pic.detect_stars(100)
+    pic.colorize_stars()
+    pic.identify_stars(30)
 
-    ids = colorize_starmap(blob_detect(pic.grayscale_array))
+    # print(pic.detected_stars.coord_map)
+    # print()
+    # print(pic.detected_stars.coords)
+    # print()
+    # print(pic.detected_stars.star_table)
+    # print()
+    # print(pic.detected_stars.ID_map)
+    print()
+    for star in pic.identified_stars:
+        print(star.ID)
 
-    x = Image.fromarray(ids)
+    x = Image.fromarray(pic.stars_colorized)
     x.show()
+    # cv2.imshow("window", pic.stars_colorized)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
