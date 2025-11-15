@@ -73,6 +73,7 @@ def blob_detect(image_array):
     equivalence_count = 0 # Number of items added to equivalence table
 
     # Raster scan binary image to check for objects
+    print(f"Scanning for stars")
     for y in range(height):
         for x in range(width):
             # Get pixel
@@ -133,6 +134,8 @@ def blob_detect(image_array):
             object_count += 1
             update_IDs.update({key: object_count})
 
+    print(f"{object_count} stars detected")
+
     # Update IDs
     for key, value in update_IDs.items():
         for i in equivalence:
@@ -143,6 +146,7 @@ def blob_detect(image_array):
     star_table = {i: [] for i in range(1, object_count + 1)}
 
     # Homogenize objects and add coords of stars to star table
+    print(f"Homogonizing")
     for y in range(height):
         for x in range(width):
             blob_pixel = pixel_id_map[y][x]
@@ -154,6 +158,7 @@ def blob_detect(image_array):
 
     # Generate list of center points
     star_coords = []
+    print(f"Getting coordinates")
     for key, value in star_table.items():
         pixel_count = len(value)
         sum_y = 0
@@ -163,12 +168,13 @@ def blob_detect(image_array):
             sum_y += value[i][0]
             sum_x += value[i][1]
 
-        # Add the coordinates of the star, as well as the number of pixels to a list
-        star_coord = [sum_y / pixel_count, sum_x/pixel_count]
-        # Add star coordinate to the coords map
-        star_coords_map[round(star_coord[0])][round(star_coord[1])] = star_coord
-        # add coordinate to coordinates list
-        star_coords.append(star_coord)
+        if pixel_count > 0:
+            # Add the coordinates of the star, as well as the number of pixels to a list
+            star_coord = [sum_y / pixel_count, sum_x/pixel_count]
+            # Add star coordinate to the coords map
+            star_coords_map[round(star_coord[0])][round(star_coord[1])] = star_coord
+            # add coordinate to coordinates list
+            star_coords.append(star_coord)
 
     return DetectedStars(pixel_id_map, star_coords_map, star_coords, star_table)
 
@@ -253,14 +259,16 @@ def weave_extract_deprecated(image_array, threshold=1):
 
 ##### Debug functions ####
 
-def colorize_starmap(labelmap: np.ndarray, seed: int = None):
+def colorize_starmap(image_array: np.ndarray, seed: int = None):
     """Convert a 2D array of object indices into a bright random RGB image."""
+
+    print(f"Creating rgb array")
 
     if seed is not None:
         np.random.seed(seed)
 
     # Get all unique labels excluding background (0)
-    labels = np.unique(labelmap)
+    labels = np.unique(image_array)
     labels = labels[labels != 0]
 
     # Generate a bright random color for each label
@@ -270,13 +278,19 @@ def colorize_starmap(labelmap: np.ndarray, seed: int = None):
         colors[lbl] = color
 
     # Prepare RGB output
-    rgb = np.zeros((*labelmap.shape, 3), dtype=np.uint8)
+    rgb = np.zeros((*image_array.shape, 3), dtype=np.uint8)
 
     # Assign colors
-    for lbl, color in colors.items():
-        rgb[labelmap == lbl] = color
+    print(f"Assigning colours")
+    for y in range(rgb.shape[0]):
+        for x in range(rgb.shape[1]):
+            if image_array[y][x] > 0:
+                rgb[y][x] = colors[image_array[y][x]]
 
     return rgb
+
+def binarize_starmap():
+    pass
 
 
 def plot_centers(coords, image):
@@ -293,4 +307,4 @@ def plot_centers(coords, image):
 #################
 
 if __name__ == "__main__":
-    print(weave_extract_deprecated(IMAGE))
+    pass

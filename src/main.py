@@ -60,9 +60,28 @@ class Astropic():
         """Generates a colorized star_IDs image"""
         self.stars_colorized = colorize_starmap(self.detected_stars.ID_map)
 
+    def preview_neighbours_radius(self, radius):
+
+        print("Creating radius preview")
+        cy = int(self.height / 2)
+        cx = int(self.width / 2)
+
+        circle = get_circle(cy, cx, radius)
+
+        preview = np.array(self.colour_array)
+
+        print(f"Circle pixels: {circle}")
+        for pixel in circle:
+            preview[pixel[0]][pixel[1]] = [255, 0, 0]
+
+        Image.fromarray(preview).show()
+
     def identify_stars(self, radius):
         """Gives identifiers to stars
         
+        Args:
+            - radius(int): Radius in pixels to search for neighbours
+
         Returns:
             identified_stars(list[Star])
         """
@@ -72,6 +91,9 @@ class Astropic():
             if ID:
                 stars.append(ID)
         self.identified_stars = stars
+
+    def _generate_binary(self, threshold):
+        self.binary = cv2.threshold(self.grayscale_array, threshold, 255, type=cv2.THRESH_BINARY)[1]
 
 
 #################
@@ -143,23 +165,34 @@ def average(pics, output):
 
 if __name__ == "__main__":
     pic = Astropic(sys.argv[1])
-    pic.detect_stars(100)
-    pic.colorize_stars()
-    pic.identify_stars(30)
 
-    # print(pic.detected_stars.coord_map)
-    # print()
-    # print(pic.detected_stars.coords)
-    # print()
-    # print(pic.detected_stars.star_table)
-    # print()
-    # print(pic.detected_stars.ID_map)
-    print()
+    threshold = int(sys.argv[2])
+    radius = int(sys.argv[3])
+
+    # Set radius based on preview
+    confirm = False
+    while not confirm:
+        pic.preview_neighbours_radius(radius)
+
+        # Confirm if user wants to use previewed radius
+        user_input = input("Use radius y/n?\n")
+        # Check response
+        if user_input.lower() in ["y", "n"]:
+            if user_input.lower() == "y":
+                confirm = True
+            else:
+                # Input new radius if current radius not satisfactory
+                radius = int(input("New radius: "))
+        else:
+            print("Invalid input")
+
+    pic.detect_stars(threshold)
+    pic.colorize_stars()
+    pic.identify_stars(radius)
+    # pic._generate_binary(250)
+
     for star in pic.identified_stars:
         print(star.ID)
 
-    x = Image.fromarray(pic.stars_colorized)
-    x.show()
-    # cv2.imshow("window", pic.stars_colorized)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    # Image.fromarray(pic.binary).show()
+    Image.fromarray(pic.stars_colorized).show()

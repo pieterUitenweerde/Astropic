@@ -61,8 +61,8 @@ def neighbour_based_id(star, AstroPic, radius):
     ID = sorted([r for r in ID if r <= radius])
     identified_star = Star(star, ID)
 
-    for pixel in get_circle(star_y, star_x, radius):
-        AstroPic.stars_colorized[pixel[0], pixel[1]][0] += 100
+    # for pixel in get_circle(star_y, star_x, radius):
+    #     AstroPic.stars_colorized[pixel[0], pixel[1]][0] += 100
 
     return identified_star
 
