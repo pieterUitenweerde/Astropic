@@ -11,6 +11,9 @@ class Star:
     def __init__(self, coord, ID):
         self.coord = coord
         self.ID = ID
+        self.has_match = False
+        self.match = None
+
 
 #################
 # Functions
@@ -77,3 +80,32 @@ def get_circle(cy, cx, radius):
             if dist <= radius:
                 circle_pixels.append([y, x])
     return circle_pixels
+
+
+def match_stars(ref_image, image, tolerance):
+    """Search for matching stars between a source and target image"""
+
+    # Get the stars in both images
+    ref_stars = ref_image.identified_stars
+    stars = image.identified_stars
+
+    # For every star in the ref image, look for matches in the source image
+    for ref_star in ref_stars:
+        # Search through source stars until a match is found
+        for star in stars:
+            # Check if IDs match
+            if compare_IDs(ref_star.ID, star.ID, tolerance):
+                star.has_match = True
+                star.match = ref_star
+
+
+def compare_IDs(id_a, id_b, tolerance):
+    """Compares two ID arrays"""
+    # If the two arrays are different lengths the IDs do not match
+    if len(id_b) != len(id_a):
+        return False
+    for value_a, value_b in zip(id_a, id_b):
+        if value_b < value_a - tolerance or value_b > value_a + tolerance:
+            return False
+    # If no mismatches are found, return true
+    return True

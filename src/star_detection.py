@@ -154,7 +154,10 @@ def blob_detect(image_array):
             if blob_pixel > 0:
                 pixel_id_map[y][x] = equivalence[blob_pixel]
                 # Add pixel to the star table
-                star_table[equivalence[blob_pixel]].append([y, x])
+                try:
+                    star_table[equivalence[blob_pixel]].append([y, x])
+                except KeyError as e:
+                    print(e)
 
     # Generate list of center points
     star_coords = []
