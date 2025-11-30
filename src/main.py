@@ -159,18 +159,89 @@ def average(pics, output):
     Image.fromarray(avg_array.astype(np.uint8)).save(output)
     return(Path(output))
 
+
+def preview_matches(pic, ref):
+    matched_stars = [s for s in pic.identified_stars if s.has_match]
+
+    match_index = len(matched_stars) - 1
+
+    coord = matched_stars[match_index].coord
+    coord_ref = matched_stars[match_index].match.coord
+
+    marker_radius = 25
+    marker_thickness = 3
+
+    circ = [p for p in get_circle(round(coord[0]), round(coord[1]), marker_radius) if p not in get_circle(round(coord[0]), round(coord[1]), marker_radius - marker_thickness)]
+    circ_ref = [p for p in get_circle(round(coord_ref[0]), round(coord_ref[1]), marker_radius) if p not in get_circle(round(coord_ref[0]), round(coord_ref[1]), marker_radius - marker_thickness)]
+
+    for pixel in circ:
+        pic.colour_array[pixel[0]][pixel[1]] = [0, 0, 255]
+
+    for pixel in circ_ref:
+        ref.colour_array[pixel[0]][pixel[1]] = [0, 0, 255]
+
+
 #################
 # Main
 #################
 
-if __name__ == "__main__":
+def test():
+    ref = Astropic(sys.argv[1])
+
+    threshold = int(sys.argv[2])
+    radius = int(sys.argv[3])
+    min_neighbours_ID = int(sys.argv[4])
+    tolerance = 1
+
+    # Set radius based on preview
+    confirm = False
+    while not confirm:
+        ref.preview_neighbours_radius(radius)
+        # Confirm if user wants to use previewed radius
+        user_input = input("Use radius y/n?\n")
+        # Check response
+        if user_input.lower() in ["y", "n"]:
+            if user_input.lower() == "y":
+                confirm = True
+            else:
+                # Input new radius if current radius not satisfactory
+                radius = int(input("New radius: "))
+        else:
+            print("Invalid input")
+
+    ref.detect_stars(threshold)
+    # ref.colorize_stars()
+    ref.identify_stars(radius, min_neighbours_ID)
+
+    # Preview a star
+    stars = ref.identified_stars
+
+    for star in stars:
+        print("Marking star: ", star.coord)
+
+        coord = star.coord
+
+        marker_radius = 25
+        marker_thickness = 3
+
+        # circ = [p for p in get_circle(round(coord[0]), round(coord[1]), marker_radius) if p not in get_circle(round(coord[0]), round(coord[1]), marker_radius - marker_thickness)]
+        circ = get_circle(round(coord[0]), round(coord[1]), 5)
+        for pixel in circ:
+            ref.colour_array[pixel[0]][pixel[1]] = [255, 0, 0]
+
+    Image.fromarray(ref.colour_array).show()
+    ref.colorize_stars()
+    Image.fromarray(ref.stars_colorized).show()
+
+
+def main():
     ref = Astropic(sys.argv[1])
     pic = Astropic(sys.argv[2])
 
     threshold = int(sys.argv[3])
     radius = int(sys.argv[4])
     min_neighbours_ID = int(sys.argv[5])
-    tolerance = 1
+    tolerance = 2
 
     # Set radius based on preview
     confirm = False
@@ -198,16 +269,18 @@ if __name__ == "__main__":
 
     match_stars(ref, pic, tolerance)
 
+    # Print matches
     for star in pic.identified_stars:
         if star.has_match:
             print(star.ID, star.match.ID)
 
-
     # Preview a star
     matched_stars = [s for s in pic.identified_stars if s.has_match]
 
-    coord = matched_stars[3].coord
-    coord_ref = matched_stars[3].match.coord
+    match_index = 2
+
+    coord = matched_stars[match_index].coord
+    coord_ref = matched_stars[match_index].match.coord
 
     marker_radius = 25
     marker_thickness = 3
@@ -221,6 +294,12 @@ if __name__ == "__main__":
     for pixel in circ_ref:
         ref.colour_array[pixel[0]][pixel[1]] = [255, 0, 0]
 
-    
     Image.fromarray(pic.colour_array).show()
     Image.fromarray(ref.colour_array).show()
+
+#################
+# Execute
+#################
+
+if __name__ == "__main__":
+    main()

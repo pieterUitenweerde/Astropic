@@ -122,9 +122,9 @@ def blob_detect(image_array):
     # Go through the equivalence table to find how many unique objects are present.
     # Re-use object count iterator
     object_count = 0
-    # Take note of IDs that have already been counted
+    # Take note of IDs that have already been counted.
     unique_IDs = []
-    # Create dict containing items that should be updated in equivelance to ID objects sequentially.
+    # Create dict containing IDs that should be updated to the correct count.
     update_IDs = {}
 
     # Count unique objects and take note of IDs that should be changed.
@@ -132,7 +132,7 @@ def blob_detect(image_array):
         if value not in unique_IDs:
             unique_IDs.append(value)
             object_count += 1
-            update_IDs.update({key: object_count})
+            update_IDs.update({value: object_count})
 
     print(f"{object_count} stars detected")
 
@@ -152,10 +152,11 @@ def blob_detect(image_array):
             blob_pixel = pixel_id_map[y][x]
             # If object
             if blob_pixel > 0:
-                pixel_id_map[y][x] = equivalence[blob_pixel]
+                new_ID = equivalence[blob_pixel]
+                pixel_id_map[y][x] = new_ID
                 # Add pixel to the star table
                 try:
-                    star_table[equivalence[blob_pixel]].append([y, x])
+                    star_table[new_ID].append([y, x])
                 except KeyError as e:
                     print(e)
 
