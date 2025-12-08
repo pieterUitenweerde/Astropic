@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 
 from star_detection import *
 from star_identification import *
+from match_transforms import *
 
 #################
 # Global variables
@@ -42,6 +43,10 @@ class Astropic():
 
         # Star identification
         self.identified_stars = [] # List of star objects 
+
+        # Transformed image
+        self.translated = None
+        self.transformed = None
 
     def detect_stars(self, threshold):
         """Detects stars in an image
@@ -94,6 +99,20 @@ class Astropic():
 
     def _generate_binary(self, threshold):
         self.binary = cv2.threshold(self.grayscale_array, threshold, 255, type=cv2.THRESH_BINARY)[1]
+
+    def transform_to_ref(self, offset, rot_center, rotation):
+        """Translates and rotates the image to match the ref image."""
+        print("OFFSET:", offset)
+
+        translation_matrix = np.array([[1, 0, -(offset[1])],
+                                       [0, 1, -(offset[0])]])
+        
+        rotation_matrix = cv2.getRotationMatrix2D((rot_center[1], rot_center[0]), -rotation, 1)
+
+        self.translated = cv2.warpAffine(self.colour_array, translation_matrix, (self.width, self.height))
+        self.transformed = cv2.warpAffine(self.translated, rotation_matrix, (self.width, self.height))
+
+
 
 
 #################
@@ -269,15 +288,22 @@ def main():
 
     match_stars(ref, pic, tolerance)
 
+    matched = []
     # Print matches
     for star in pic.identified_stars:
         if star.has_match:
-            print(star.ID, star.match.ID)
+            matched.append(star)
+            # print(star.ID, star.match.ID)
 
-    # Preview a star
+    # print()
+    # Test offset script
+    frac = int(len(matched) / 5)
+    pic.transform_to_ref(*get_offset(matched[frac], matched[frac * 4]))
+
+    # Preview a star ###############
     matched_stars = [s for s in pic.identified_stars if s.has_match]
 
-    match_index = 2
+    match_index = frac
 
     coord = matched_stars[match_index].coord
     coord_ref = matched_stars[match_index].match.coord
@@ -294,8 +320,11 @@ def main():
     for pixel in circ_ref:
         ref.colour_array[pixel[0]][pixel[1]] = [255, 0, 0]
 
-    Image.fromarray(pic.colour_array).show()
+    # Show images ################
+    # Image.fromarray(pic.colour_array).show()
     Image.fromarray(ref.colour_array).show()
+    Image.fromarray(pic.transformed).show()
+    ##############################
 
 #################
 # Execute
