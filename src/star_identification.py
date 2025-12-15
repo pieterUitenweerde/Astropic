@@ -33,9 +33,9 @@ def neighbour_based_id(star, AstroPic, radius):
     star_x = round(star[1])
 
     # Make sure star is not too close to edge
-    if star_y - radius < 0 or star_x - radius < 0:
+    if star_y - radius < 1 or star_x - radius < 1:
         return
-    if star_y + radius >= AstroPic.height or star_x + radius >= AstroPic.width:
+    if round(star_y) + radius >= AstroPic.height or round(star_x) + radius >= AstroPic.width:
         return
 
     # Search for neighbours in square first to reduce calculations
