@@ -127,7 +127,7 @@ class Astropic():
 # Functions
 #################
 
-def get_images(path, type="light"):
+def get_images(path, type="light", as_astropic=True):
     """
     Grabs image files from the provided path.
     
@@ -159,9 +159,128 @@ def get_images(path, type="light"):
         raise RuntimeError("No files found in directory.")
 
     # Return images as astropics
-    images = [Astropic(file, type=type) for file in files if filetype.is_image(file)]
-    n_images = len(images)
+
+    if as_astropic:
+        images = [Astropic(file, type=type) for file in files if filetype.is_image(file)]
+    else:
+        images = [file for file in files if filetype.is_image(file)]
+    
+    if isinstance(images, list):
+        n_images = len(images)
+    elif isinstance(images, str):
+        n_images = 1
+
     return images, n_images
+
+
+def process_lights(
+                   lights_paths,
+                   ref,
+                   min_stars=0,
+                   min_matches=4,
+                   ID_neighbour_tolerance=2,
+                   star_brightness_threshold=0.8, 
+                   noise_blur=2, 
+                   star_ID_radius=180, 
+                   min_neighbours=2,  
+                   dark=None
+                   ):
+    """Processes and stacks light frames"""
+
+    n_paths = len(lights_paths)
+    stack_count = 0
+    add_array = np.zeros(ref.colour_array.shape, dtype=np.float32)
+
+    # Iterate over all input paths
+    for i, path in enumerate(lights_paths):
+        print(f"Processing light {i + 1}/{n_paths}: {path}")
+
+        # Validate path
+        if not os.path.exists(path):
+            print("Invalid light path: ", path)
+            continue
+        
+        # Initialize light as astropic
+        pic = Astropic(path, type="light")
+        
+        # Subtract dark frame
+        if dark is not None:
+            pic.colour_array = cv2.subtract(pic.colour_array, dark)
+            pic.grayscale_array = cv2.cvtColor(pic.colour_array, cv2.COLOR_BGR2GRAY)
+        else:
+            pic.grayscale_array = cv2.cvtColor(pic.colour_array, cv2.COLOR_BGR2GRAY)
+
+        # Detect and identify stars
+        pic.detect_stars(star_brightness_threshold, noise_blur)
+        pic.identify_stars(star_ID_radius, min_neighbours)
+
+        if len(pic.identified_stars) < min_stars:
+            print(f"Too few stars detected in light {i}, skipping.")
+            continue
+
+        # Match stars
+        match_stars(ref, pic, ID_neighbour_tolerance)
+
+        matched = []
+        # Create array of matches
+        for star in pic.identified_stars:
+            if star.has_match:
+                matched.append(star)
+
+        n_matches = len(matched)
+        print(f"Matched {n_matches} stars")
+        # Check if enough matched stars
+        if n_matches < min_matches:
+            print(f"Too few stars matched in light {i + 1}, skipping.")
+            continue
+        # ---------------------------------------------------------------------
+
+        # Offset ----------------------------------------------------------
+        # Select matches with large distance between them for accuracy
+        star_a = matched[0]
+
+        star_b = None
+        furthest_dist = 0
+        for star in matched:
+            if star == star_a:
+                continue
+            a = star.coord[0] - star_a.coord[0]
+            b = star.coord[1] - star_a.coord[1]
+            dist = math.sqrt(a * a + b * b)
+
+            if dist > furthest_dist:
+                furthest_dist = dist
+                star_b = star
+
+        try:
+            pic.transform_to_ref(*get_offset(star_a, star_b))
+        except Exception as e:
+            print(e)
+            continue
+
+        # Add image to stack
+        add_array += pic.transformed
+        # Add image to count
+        stack_count += 1
+        # ----------------------------------------------------------
+    # Divide stack by count
+    avg_array = add_array / stack_count
+    return avg_array
+
+
+def average_darks(darks, ref):
+    """Outputs averaged dark frame"""
+    add_array = np.zeros(ref.colour_array.shape, dtype=np.float32)
+    dark_count = 0
+
+    for path in darks:
+        dark = Astropic(path, type="dark")
+
+        add_array += dark.colour_array
+        dark_count += 1
+
+    avg_array = add_array / dark_count
+    return avg_array
 
 
 def average_saved_images(pics, output):
@@ -188,6 +307,7 @@ def average_saved_images(pics, output):
     # Output averaged image
     Image.fromarray(avg_array.astype(np.uint8)).save(output)
     return(Path(output))
+
 
 def average(pics, data_type=np.float32):
     """
@@ -305,22 +425,22 @@ def main():
     # Get lights -----------------------------------------------------
     if os.path.isdir(lights_path):
         try:
-            lights, n_lights_found = get_images(lights_path, type="light")
+            lights, n_lights_found = get_images(lights_path, type="light", as_astropic=False)
         except:
             print("Invalid lights directory path.")
             return
     elif os.path.exists(lights_path):
-        lights = [Astropic(lights_path)]
+        lights = [lights_path]
 
     # Get darks -----------------------------------------------------
     if os.path.isdir(darks_path):
         try:
-            darks, n_darks_found = get_images(darks_path, type="dark")
+            darks, n_darks_found = get_images(darks_path, type="dark", as_astropic=False)
         except:
             print("Invalid darks directory path.")
             return
     elif os.path.exists(darks_path):
-        darks = [Astropic(darks_path)]
+        darks = [darks_path]
     # ----------------------------------------------------------------
 
     # Radius ---------------------------------------------------------
@@ -342,18 +462,16 @@ def main():
     # ----------------------------------------------------------
 
     # Process darks --------------------------------------------------
-    dark_arrays = [a.colour_array for a in darks]
-    dark_array = average(dark_arrays) # 32bit float array
-    # Get the median brightness of the image
-    # dark_levels = np.average(np.median(dark_array, axis=0))
-    # Clip dark values
-    dark_array = dark_array.astype(BITDEPTH)
-    dark_array = cv2.cvtColor(dark_array, cv2.COLOR_BGR2GRAY)
-    dark_array = cv2.cvtColor(dark_array, cv2.COLOR_GRAY2BGR)
+    dark_array = average_darks(darks, ref).astype(BITDEPTH)
+    # dark_arrays = [a.colour_array for a in darks]
+    # dark_array = average(dark_arrays) # 32bit float array
+    # # Get the median brightness of the image
+    # # dark_levels = np.average(np.median(dark_array, axis=0))
+    # # Clip dark values
+    # dark_array = dark_array.astype(BITDEPTH)
     # ----------------------------------------------------------
 
     # Process ref -----------------------------------------
-
     ref.colour_array = cv2.subtract(ref.colour_array, dark_array)
     # ref.colour_array[ref.colour_array < 0] = 0
     ref.grayscale_array = cv2.cvtColor(ref.colour_array, cv2.COLOR_BGR2GRAY)
@@ -364,84 +482,29 @@ def main():
     # Validate ref
     if len(ref.identified_stars) < min_stars:
         raise RuntimeError("Too few stars detected in ref image.")
-    
-    # Process lights --------------------------------------------------
-    processed_lights = []
-    for i, pic in enumerate(lights):
-        print(f"Processing light {i + 1}/{n_lights_found}: {pic.path}")
 
-        pic.colour_array = cv2.subtract(pic.colour_array, dark_array)
-        pic.grayscale_array = cv2.cvtColor(pic.colour_array, cv2.COLOR_BGR2GRAY)
-
-        # Detect and identify stars
-        pic.detect_stars(threshold, noise_blur)
-        pic.identify_stars(radius, min_neighbours_ID)
-
-        if len(pic.identified_stars) < min_stars:
-            print(f"Too few stars detected in light {i}, skipping.")
-            continue
-
-        # Match stars
-        match_stars(ref, pic, tolerance)
-
-        matched = []
-        # Print matches
-        for star in pic.identified_stars:
-            if star.has_match:
-                matched.append(star)
-                # print(star.ID, star.match.ID)
-
-        n_matches = len(matched)
-        print(f"Matched {n_matches} stars")
-        # Check enough matched stars
-        if n_matches < min_matches:
-            print(f"Too few stars matched in light {i + 1}, skipping.")
-            continue
-        # ---------------------------------------------------------------------
-
-        # Offset ----------------------------------------------------------
-        # Select matches with large distance between them for accuracy
-        star_a = matched[0]
-
-        star_b = None
-        furthest_dist = 0
-        for star in matched:
-            if star == star_a:
-                continue
-            a = star.coord[0] - star_a.coord[0]
-            b = star.coord[1] - star_a.coord[1]
-            dist = math.sqrt(a * a + b * b)
-
-            if dist > furthest_dist:
-                furthest_dist = dist
-                star_b = star
-
-        try:
-            pic.transform_to_ref(*get_offset(star_a, star_b))
-        except Exception as e:
-            print(e)
-            continue
-        # Add image to processed lights list
-        processed_lights.append(pic.transformed)
-        # ----------------------------------------------------------
-    
-    # Create stacked image ----------------------------------------------------------
-    n_lights = len(processed_lights)
-
-    print(f"\n{n_lights} lights registered")
-    print("\n=======================================================================")
-    print(f"\nStacking {n_lights} lights\n")
-
-    # Normalize 32bit float values to 16bit ints
-    stacked_image = average(processed_lights)
-    # Convert image to 16bit 
-    img16 = (stacked_image).astype(np.uint16)
-
-    # Output averaged image
-    cv2.imwrite(output_path, img16)
+    # Process lights ----------------------------------------------------------
+    stacked_image = process_lights(
+                   lights,
+                   ref,
+                   min_stars=0,
+                   min_matches=4,
+                   ID_neighbour_tolerance=tolerance,
+                   star_brightness_threshold=threshold, 
+                   noise_blur=noise_blur, 
+                   star_ID_radius=radius, 
+                   min_neighbours=min_neighbours_ID,  
+                   dark=dark_array
+                   )
     # ----------------------------------------------------------
 
-    # Show stacked image ----------------------------------------------------------
+    # Convert image to 16bit ----------------------------------------------------------
+    img16 = (stacked_image).astype(np.uint16)
+    # ----------------------------------------------------------
+
+    # Output averaged image ----------------------------------------------------------
+    cv2.imwrite(output_path, img16)
+    # Show stacked image
     Image.open(output_path).show()
     # ----------------------------------------------------------
 
