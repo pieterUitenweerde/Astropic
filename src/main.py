@@ -1,6 +1,6 @@
 """Main functions for image processing"""
 
-import sys
+import argparse
 import os
 from pathlib import Path
 
@@ -88,7 +88,7 @@ class Astropic():
         Image.fromarray(preview).show()
         
     def identify_stars(self, radius, minimum):
-        """Gives identifiers to stars
+        """Get star IDs
         
         Args:
             - radius(int): Radius in pixels to search for neighbours.
@@ -108,6 +108,7 @@ class Astropic():
         print(f"Identified {len(stars)} stars")
 
     def _generate_binary(self, threshold):
+        """Threshold image to get binary."""
         self.binary = cv2.threshold(self.grayscale_array, threshold, 255, type=cv2.THRESH_BINARY)[1]
 
     def transform_to_ref(self, offset, rot_center, rotation):
@@ -352,24 +353,6 @@ def preview_matches(pic, ref):
     for pixel in circ_ref:
         ref.colour_array[pixel[0]][pixel[1]] = [0, 0, 255]
 
-
-def circle_star(pic, match_index):
-    """Draws a circle around an identified star"""
-    # Preview a star ----------------------------------------------------------
-    matched_stars = [s for s in pic.identified_stars if s.has_match]
-
-    coord = matched_stars[match_index].coord
-    coord_ref = matched_stars[match_index].match.coord
-
-    marker_radius = 25
-    marker_thickness = 3
-
-    circ = [p for p in get_circle(round(coord[0]), round(coord[1]), marker_radius) if p not in get_circle(round(coord[0]), round(coord[1]), marker_radius - marker_thickness)]
-    
-    for pixel in circ:
-        pic.colour_array[pixel[0]][pixel[1]] = [255, 0, 0]
-    # ----------------------------------------------------------
-
 #################
 # Main
 #################
@@ -380,42 +363,63 @@ def main():
     
     <reference path> <lights path> <threshold> <radius> <min_neighbours_ID> <ouput path> 
     """
-    # Input ----------------------------------------------------------
+    # CLI ----------------------------------------------------------
+    parser = argparse.ArgumentParser(
+                    prog="Astropic",
+                    description="A simple command line astrophotography image stacker.",
+                    epilog="==========================================================")
+    parser.add_argument("ref", help="Reference image to determine framing of output.",
+                        type=Path)
+    parser.add_argument("lights_path", help="Path to directory containing light frames.",
+                        type=Path)
+    parser.add_argument("output_path", help="Path to output file, including file extension.", 
+                        type=Path)
+    parser.add_argument("-d", "--darks_path", help="Path to directory containing dark frames." \
+    "\nDarks are used to subtract consistent noise patterns and banding from images." \
+    "\nCAPTURING DARKS: Make sure the camera has the same ISO, shutter speed, and temparature as when the" \
+    "lights were captured. Block all light from reaching the sensor, and capture 20-100 images. Astropic averages" \
+    "the dark frames to create a master dark that contains any banding and consistent noise patterns the " \
+    "sensor creates", type=Path)
+    parser.add_argument("-t", "--threshold", default=0.85, help="Star brightness threshold.")
+    parser.add_argument("-r", "--radius", default=200, help="Star ID search radius.")
+    parser.add_argument("-nb","--noise_blur", default=2, help="Star detection pre-blur.")
+    args = parser.parse_args()
+    # ----------------------------------------------------------------
+
+    # Load inputs ----------------------------------------------------------
     # Ref image
     try:
-        ref = Astropic(sys.argv[1], type="ref")
+        ref = Astropic(args.ref, type="ref")
     except:
         print("Invalid reference image.")
         return
-    
+
     BITDEPTH = ref.colour_array.dtype
     WHITE = np.iinfo(BITDEPTH).max
 
     print(f"Data type: {BITDEPTH}\nMax pixel value: {WHITE}")
     
     # Lights directory
-    lights_path = sys.argv[2]
+    lights_path = args.lights_path
+    if not lights_path.exists():
+        raise NotADirectoryError("Invalid lights path.")
 
     # Output path
-    output_path = sys.argv[3]
-    try:
-        Path(output_path)
-    except Exception as e:
-        print("Invalid output path", e)
-        return
+    output_path = args.output_path
+    if not output_path.exists():
+        raise NotADirectoryError("Invalid darks path.")
     
-    # Parameters
-    try:
-        threshold = float(sys.argv[4]) * WHITE
-        radius = int(sys.argv[5])
-        noise_blur = int(sys.argv[6])
-    except:
-        print("Invalid parameters supplied.")
-        return
-    
-    # Darks path
-    darks_path = sys.argv[7]
+    # Darks directory
+    darks_path = args.darks_path
+    if not darks_path.exists():
+        raise NotADirectoryError("Invalid darks path.")
 
+    # Parameters
+    threshold = float(args.threshold) * WHITE
+    radius = int(args.radius)
+    noise_blur = int(args.noise_blur)
+
+    # Non-exposed parameters
     min_stars = 20 # Min stars detected in an image to process
     min_neighbours_ID = 3 # Min neighbours for a star to be considered identified 
     tolerance = 2 # ID match distance tolerance (pixels)
@@ -463,17 +467,10 @@ def main():
 
     # Process darks --------------------------------------------------
     dark_array = average_darks(darks, ref).astype(BITDEPTH)
-    # dark_arrays = [a.colour_array for a in darks]
-    # dark_array = average(dark_arrays) # 32bit float array
-    # # Get the median brightness of the image
-    # # dark_levels = np.average(np.median(dark_array, axis=0))
-    # # Clip dark values
-    # dark_array = dark_array.astype(BITDEPTH)
     # ----------------------------------------------------------
 
     # Process ref -----------------------------------------
     ref.colour_array = cv2.subtract(ref.colour_array, dark_array)
-    # ref.colour_array[ref.colour_array < 0] = 0
     ref.grayscale_array = cv2.cvtColor(ref.colour_array, cv2.COLOR_BGR2GRAY)
 
     ref.detect_stars(threshold, noise_blur)
@@ -482,13 +479,14 @@ def main():
     # Validate ref
     if len(ref.identified_stars) < min_stars:
         raise RuntimeError("Too few stars detected in ref image.")
+    # ----------------------------------------------------------
 
     # Process lights ----------------------------------------------------------
     stacked_image = process_lights(
                    lights,
                    ref,
-                   min_stars=0,
-                   min_matches=4,
+                   min_stars=min_stars,
+                   min_matches=min_matches,
                    ID_neighbour_tolerance=tolerance,
                    star_brightness_threshold=threshold, 
                    noise_blur=noise_blur, 
@@ -509,7 +507,7 @@ def main():
     # ----------------------------------------------------------
 
 #################
-# Execute
+# Testing
 #################
 
 if __name__ == "__main__":
