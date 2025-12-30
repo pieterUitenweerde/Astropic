@@ -1,4 +1,4 @@
-"""Main functions for image processing"""
+"""ASTROPIC © Pieter Uitenweerde"""
 
 import argparse
 import os
@@ -22,14 +22,16 @@ class Astropic():
     """
     Class for astrophotography images
     
-    Types: light, reference image, dark
+    Types: light, ref, dark
     """
     def __init__(self, path, type="light"):
+        """Load image and usefulk attributes from path."""
         self.path = path
         self.type = type
 
         self.colour_array = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         self.grayscale_array = None #cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        # Create 8bit array for easier previewing of ref image
         if type == "ref":
             self.colour_array_8 = cv2.imread(path, cv2.IMREAD_COLOR)
 
@@ -50,13 +52,17 @@ class Astropic():
 
     def detect_stars(self, threshold, smoothing):
         """Detects stars in an image
+
+        Args:
+            threshold(int): Brightness threshold.
+            smoothing(int): Amount i age will be blurred prior to binarization. Useful for killing hot pixels.
+
         Return:
             Stars object:
                     ID_map: A 2D array of the image with IDs assigned to all pixels belonging to stars.
                     coord_map: A 3D array storing the center points of all stars.
                     coords: The coordinates of stars in the image. 
                     star_table: A dict listing all the detected stars and their associated pixels.
-            Colorized image (np.array)
         """
         blur_kernel = (smoothing, smoothing)
 
@@ -69,11 +75,11 @@ class Astropic():
         self.detected_stars = blob_detect(binary)
 
     def colorize_stars(self):
-        """Generates a colorized star_IDs image"""
+        """Generate a colorized star_IDs array."""
         self.stars_colorized = colorize_starmap(self.detected_stars.ID_map)
 
     def preview_neighbours_radius(self, radius):
-
+        """Show a preview of the neighbour ID radius to the user."""
         print("Creating radius preview")
         cy = int(self.height / 2)
         cx = int(self.width / 2)
@@ -97,6 +103,7 @@ class Astropic():
         Returns:
             identified_stars(list[Star])
         """
+        print("Getting star IDs")
         stars = []
         for star in self.detected_stars.coords:
             identified_star = neighbour_based_id(star, self, radius)
@@ -112,7 +119,7 @@ class Astropic():
         self.binary = cv2.threshold(self.grayscale_array, threshold, 255, type=cv2.THRESH_BINARY)[1]
 
     def transform_to_ref(self, offset, rot_center, rotation):
-        """Translates and rotates the image to match the ref image."""
+        """Translate and rotate the image to match the ref image."""
         print("OFFSET:", offset)
 
         translation_matrix = np.array([[1, 0, -(offset[1])],
@@ -130,10 +137,12 @@ class Astropic():
 
 def get_images(path, type="light", as_astropic=True):
     """
-    Grabs image files from the provided path.
+    Grab image files from the provided path.
     
     Args:
         path(str): Path of a directory containing images.
+        type(str): Load images as specified type when loaded as Astropics.
+        as_astropic(bool): Load images as astropics.
     Return:
         list[path]: List of absolute path objects to images.
         n_images(int): Number i=of images found.
@@ -186,7 +195,25 @@ def process_lights(
                    min_neighbours=2,  
                    dark=None
                    ):
-    """Processes and stacks light frames"""
+    """
+    Process and stack light frames.
+
+    Args:
+        lights_paths(list[str]): Paths to light frames to be processed.
+        ref(Astropic): Reference image to which all lights will be transformed prior to stacking.
+        min_stars(int): Minimum number of detected stars for an image to be processed.
+        min_matches(int): Minimum number of star matches between a light and the ref for the light to be stacked.
+        ID_neighbour_tolerance(int): Distance tolerance for neighbour ID matching.
+        star_brightness_threshold(int): Minimum brightness for a star to be detected (0-1).
+        noise_blur(int): Blur applied to an image prior to binarization in order to reduce false star detections from
+                         noise.
+        star_ID_radius(int): Radius around a star within which neighbours will be used to create the star's ID.
+        min_neighbours (int): Minimum number of neighbouring stars detected for a star to be considered IDd.
+        dark(np.array): The master dark array.
+    
+    Return:
+        avg_array(np.array): An image created by stacking and averaging all light frames. 
+    """
 
     n_paths = len(lights_paths)
     stack_count = 0
@@ -269,8 +296,8 @@ def process_lights(
     return avg_array
 
 
-def average_darks(darks, ref):
-    """Outputs averaged dark frame"""
+def average_darks(darks, ref, hsv_scaler=[1, 1, 1]):
+    """Output averaged dark frame"""
     add_array = np.zeros(ref.colour_array.shape, dtype=np.float32)
     dark_count = 0
 
@@ -280,13 +307,25 @@ def average_darks(darks, ref):
         add_array += dark.colour_array
         dark_count += 1
 
+    print("Processing master dark")
     avg_array = add_array / dark_count
-    return avg_array
+
+    hsv_dark = cv2.cvtColor(avg_array, cv2.COLOR_BGR2HSV).astype("float32")
+    h, s, v = cv2.split(hsv_dark)  
+
+    h = h + hsv_scaler[0]
+    s = s * hsv_scaler[1]
+    v = v * hsv_scaler[2]
+
+    hsv_merged = cv2.merge([h, s, v])
+    dark = cv2.cvtColor(hsv_merged, cv2.COLOR_HSV2BGR)
+
+    return dark
 
 
 def average_saved_images(pics, output):
     """
-    Averages input images
+    Average input images.
     
     Args:
         images(list[Path]): List of image paths.
@@ -310,58 +349,13 @@ def average_saved_images(pics, output):
     return(Path(output))
 
 
-def average(pics, data_type=np.float32):
-    """
-    Averages input images
-    
-    Args:
-        images(list[np.array]): List of image arrays.
-        output(path): File to output.
-    Return:
-        image(Path): Path object pointing to the averaged image.
-    """
-    pic_count = len(pics)
-    print(f"{pic_count} images will be averaged.")
-
-    # Averaging images
-    add_array = np.zeros(pics[0].shape, dtype=data_type)
-
-    for image in pics:
-        add_array += image
-
-    avg_array = add_array / pic_count
-    return avg_array
-
-
-def preview_matches(pic, ref):
-    matched_stars = [s for s in pic.identified_stars if s.has_match]
-
-    match_index = len(matched_stars) - 1
-
-    coord = matched_stars[match_index].coord
-    coord_ref = matched_stars[match_index].match.coord
-
-    marker_radius = 25
-    marker_thickness = 3
-
-    circ = [p for p in get_circle(round(coord[0]), round(coord[1]), marker_radius) if p not in get_circle(round(coord[0]), round(coord[1]), marker_radius - marker_thickness)]
-    circ_ref = [p for p in get_circle(round(coord_ref[0]), round(coord_ref[1]), marker_radius) if p not in get_circle(round(coord_ref[0]), round(coord_ref[1]), marker_radius - marker_thickness)]
-
-    for pixel in circ:
-        pic.colour_array[pixel[0]][pixel[1]] = [0, 0, 255]
-
-    for pixel in circ_ref:
-        ref.colour_array[pixel[0]][pixel[1]] = [0, 0, 255]
-
 #################
 # Main
 #################
 
 def main():
     """
-    Usage:
-    
-    <reference path> <lights path> <threshold> <radius> <min_neighbours_ID> <ouput path> 
+    Astropic main function. Handles CLI and image processing logic.
     """
     # CLI ----------------------------------------------------------
     parser = argparse.ArgumentParser(
@@ -372,17 +366,25 @@ def main():
                         type=Path)
     parser.add_argument("lights_path", help="Path to directory containing light frames.",
                         type=Path)
-    parser.add_argument("output_path", help="Path to output file, including file extension.", 
+    parser.add_argument("output_path", help="Path to output file, including .tif file extension.", 
                         type=Path)
+    
     parser.add_argument("-d", "--darks_path", help="Path to directory containing dark frames." \
     "\nDarks are used to subtract consistent noise patterns and banding from images." \
     "\nCAPTURING DARKS: Make sure the camera has the same ISO, shutter speed, and temparature as when the" \
     "lights were captured. Block all light from reaching the sensor, and capture 20-100 images. Astropic averages" \
     "the dark frames to create a master dark that contains any banding and consistent noise patterns the " \
     "sensor creates", type=Path)
-    parser.add_argument("-t", "--threshold", default=0.85, help="Star brightness threshold.")
-    parser.add_argument("-r", "--radius", default=200, help="Star ID search radius.")
-    parser.add_argument("-nb","--noise_blur", default=2, help="Star detection pre-blur.")
+    parser.add_argument("-dh", "--darkH", default=0, help="Dark hue shift.")
+    parser.add_argument("-ds", "--darkS", default=0, help="Dark saturation scale. Default 0")
+    parser.add_argument("-dv", "--darkV", default=1, help="Dark value scale.")
+
+    parser.add_argument("-t", "--threshold", default=0.85, help="Star ID search radius in pixels.The raltive " \
+    "positions of neighbours within the radius is used to identify individual stars over a set of images.")
+    parser.add_argument("-r", "--radius", default=200, help="Star brightness threshold (0-1). Only stars with a brightness " \
+    "above the threshold will be detected.")
+    parser.add_argument("-nb","--noise_blur", default=2, help="Star detection pre-blur. Blur can be applied " \
+    "to the image to reduce the chances of hot pixels being detected as stars.")
     args = parser.parse_args()
     # ----------------------------------------------------------------
 
@@ -393,6 +395,8 @@ def main():
     except:
         print("Invalid reference image.")
         return
+    
+    global WHITE, BITDEPTH
 
     BITDEPTH = ref.colour_array.dtype
     WHITE = np.iinfo(BITDEPTH).max
@@ -406,18 +410,20 @@ def main():
 
     # Output path
     output_path = args.output_path
-    if not output_path.exists():
-        raise NotADirectoryError("Invalid darks path.")
+    if not output_path.parent.exists():
+        raise NotADirectoryError("Invalid output path.")
     
     # Darks directory
     darks_path = args.darks_path
-    if not darks_path.exists():
-        raise NotADirectoryError("Invalid darks path.")
+    if darks_path:
+        if not darks_path.exists():
+            raise NotADirectoryError("Invalid darks path.")
 
     # Parameters
     threshold = float(args.threshold) * WHITE
     radius = int(args.radius)
     noise_blur = int(args.noise_blur)
+    darkHSVscale = [float(args.darkH), float(args.darkS), float(args.darkV)]
 
     # Non-exposed parameters
     min_stars = 20 # Min stars detected in an image to process
@@ -437,14 +443,15 @@ def main():
         lights = [lights_path]
 
     # Get darks -----------------------------------------------------
-    if os.path.isdir(darks_path):
-        try:
-            darks, n_darks_found = get_images(darks_path, type="dark", as_astropic=False)
-        except:
-            print("Invalid darks directory path.")
-            return
-    elif os.path.exists(darks_path):
-        darks = [darks_path]
+    if darks_path:
+        if os.path.isdir(darks_path):
+            try:
+                darks, n_darks_found = get_images(darks_path, type="dark", as_astropic=False)
+            except:
+                print("Invalid darks directory path.")
+                return
+        elif os.path.exists(darks_path):
+            darks = [darks_path]
     # ----------------------------------------------------------------
 
     # Radius ---------------------------------------------------------
@@ -466,12 +473,21 @@ def main():
     # ----------------------------------------------------------
 
     # Process darks --------------------------------------------------
-    dark_array = average_darks(darks, ref).astype(BITDEPTH)
+    if darks_path:
+        dark_array = average_darks(darks, ref, hsv_scaler=darkHSVscale).astype(BITDEPTH)
+    else:
+        dark_array = None
     # ----------------------------------------------------------
 
     # Process ref -----------------------------------------
-    ref.colour_array = cv2.subtract(ref.colour_array, dark_array)
+    if darks_path:
+        ref.colour_array = cv2.subtract(ref.colour_array, dark_array)
     ref.grayscale_array = cv2.cvtColor(ref.colour_array, cv2.COLOR_BGR2GRAY)
+
+    # Ref preview
+    # cv2.imshow("test", ref.colour_array)
+    # cv2.waitKey()
+    # cv2.destroyAllWindows()
 
     ref.detect_stars(threshold, noise_blur)
     ref.identify_stars(radius, min_neighbours_ID)

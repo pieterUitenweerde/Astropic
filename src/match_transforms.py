@@ -10,7 +10,7 @@ from star_identification import *
 #################
 
 def get_offset(starA, starB):
-    """transform image to match image using two identified stars as reference points"""
+    """Transform image to match image using two identified stars as reference points."""
     # First, find the offset by matching the positions of starA
     offset = np.array(starA.coord) - np.array(starA.match.coord)
     rot_center = np.array(starA.coord) - offset

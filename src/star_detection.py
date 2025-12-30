@@ -183,84 +183,6 @@ def blob_detect(image_array):
     return DetectedStars(pixel_id_map, star_coords_map, star_coords, star_table)
 
 
-def weave_extract_deprecated(image_array, threshold=1):
-
-    def list_star_recurse(y, x, direction=1, blnk=0):
-        """Recursively searches neighbours for bright pixels, building a star array"""
-        # Try except will not work with lower level language
-        try:
-            # Check if current pixel is >= threshold
-            if image_array[y][x] >= threshold:
-                blnk_n = 0
-                star.append([y, x])
-
-                # Step to the side
-                list_star_recurse(y, x + direction, direction=direction, blnk=blnk_n)
-
-            else:
-                if blnk == 0:
-                    # Check if pixel below is >= threshold
-                    if image_array[y + 1][x] >= threshold:
-                        #star_list.append([y + 1, x])
-
-                        blnk_n = 0
-
-                        # Step to the side
-                        list_star_recurse(y, x + direction, direction=direction, blnk=blnk_n)
-
-                    # Check if pixel diagonally down is >= threshold
-                    else:
-                        new_dir = direction * -1
-
-                        blnk_n = blnk + 1
-
-                        # Step diagonally down
-                        list_star_recurse(y + 1, x + new_dir, direction=new_dir, blnk=blnk_n)
-
-                else:
-                # Move to the side to check for bright pixels
-                    if blnk < blank_threshold:
-                        blnk_n = blnk + 1
-                        list_star_recurse(y, x + direction, direction=direction, blnk=blnk_n)
-
-                    elif blnk == blank_threshold:
-                        return
-            
-        except IndexError:
-            return
-        #----------------------------------------------------------------------------
-
-    #### Function body ####
-    height = len(image_array)
-    width = len(image_array[0])
-
-    star_list = []
-    blank_threshold = 2
-
-    for y, row in enumerate(image_array):
-        for x, pixel in enumerate(row):
-            if pixel >= threshold:
-                star = []
-                if not [y, x] in star:
-                    list_star_recurse(y, x, direction=1, blnk=0)
-                star_list.append(star)
-    
-    star_coords = []
-    for star in star_list:
-        center = [0, 0]
-        pixel_count = len(star)
-        sum_y = 0
-        sum_x = 0
-
-        for i in range(pixel_count):
-            sum_y += star[i][0]
-            sum_x += star[i][1]
-
-        center = [sum_y / pixel_count, sum_x/pixel_count]
-        star_coords.append(center)
-
-    return star_coords
-
 ##### Debug functions ####
 
 def colorize_starmap(image_array: np.ndarray, seed: int = None):
@@ -292,9 +214,6 @@ def colorize_starmap(image_array: np.ndarray, seed: int = None):
                 rgb[y][x] = colors[image_array[y][x]]
 
     return rgb
-
-def binarize_starmap():
-    pass
 
 
 def plot_centers(coords, image):

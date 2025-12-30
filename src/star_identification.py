@@ -8,6 +8,7 @@ import math
 #################
 
 class Star:
+    """Store data associated with an identified star."""
     def __init__(self, coord, ID):
         self.coord = coord
         self.ID = ID
@@ -20,10 +21,14 @@ class Star:
 #################
 
 def neighbour_based_id(star, AstroPic, radius):
-    """Generates an ID for a star based on the relative positions of its neighbours
+    """Generate an ID for a star based on the relative positions of its neighbours.
+
+    Args:
+        AstroPic(Astropic): Image.
+        radius(int): Neighbour search radius.
     
     Returns:
-        ID (list[float]): A sorted list of distances to neighbouring stars.
+        ID(list[float]): A sorted list of distances to neighbouring stars.
     """
     coord_map = AstroPic.detected_stars.coord_map
     neighbours = [] # Store neighbours in list
@@ -71,6 +76,18 @@ def neighbour_based_id(star, AstroPic, radius):
 
 
 def get_circle(cy, cx, radius):
+    """
+    Get all pixels within a circle defined by the radius and center point.
+
+    Args:
+        cy(float): Midpoint Y coordinate.
+        cx(float): Midpoint X coordinate.
+        radius(int): Circle radius.
+
+    Return:
+        circle_pixels(list[x, y]): List of pixels as XY coordinates.
+    
+    """
     circle_pixels = []
     for y in range(cy - radius, cy + radius + 1): # Loop over the vertical pixels
         for x in range(cx - radius, cx + radius + 1): # Loop over the horizontal pixels
@@ -83,7 +100,14 @@ def get_circle(cy, cx, radius):
 
 
 def match_stars(ref_image, image, tolerance):
-    """Search for matching stars between a source and target image"""
+    """
+    Search for matching stars between a source and target image
+
+    Args:
+        ref_image(Astropic): Image to which the image will be matched.
+        image(Astropic): Image.
+    
+    """
 
     # Get the stars in both images
     ref_stars = ref_image.identified_stars
@@ -100,7 +124,18 @@ def match_stars(ref_image, image, tolerance):
 
 
 def compare_IDs(id_a, id_b, tolerance):
-    """Compares two ID arrays"""
+    """
+    Compares two ID arrays.
+
+    Args:
+        id_a(list[float]): ID of star to compare to.
+        id_b(list[float]): ID of star.
+        tolerance(flaot): Match tolerance in pixels (sub-pixel distances allowed).
+
+    Return:
+        (bool): True if match, else false.
+    
+    """
     # If the two arrays are different lengths the IDs do not match
     if len(id_b) != len(id_a):
         return False
