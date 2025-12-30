@@ -74,30 +74,30 @@ All algortihms related to identifying specific stars.
 
 ## Manual:
 
-###### Usage:
+### Usage:
 Astropic [-h] [-d DARKS_PATH] [-dh DARKH] [-ds DARKS] [-dv DARKV] [-t THRESHOLD] [-r RADIUS] [-nb NOISE_BLUR]ref lights_path output_path
 
-###### positional arguments:
+#### positional arguments:
 ref                   Reference image to determine framing of output.
 lights_path           Path to directory containing light frames.
 output_path           Path to output file, including .tif file extension.
 
-###### optional arguments:
-###### -h, --help            
+#### optional arguments:
+#### -h, --help            
 show this help message and exit
-###### -d DARKS_PATH, --darks_path DARKS_PATH
-                    Path to directory containing dark frames. Darks are used to subtract consistent noise patterns and banding from images. CAPTURING DARKS: Make sure
-                    the camera has the same ISO, shutter speed, and temperature as when the lights were captured. Block all light from reaching the sensor, and capture
-                    20-100 images. Astropic averages the dark frames to create a master dark that contains any banding and consistent noise patterns the sensor creates
-###### -dh DARKH, --darkH DARKH
-                    Dark hue shift.
-###### -ds DARKS, --darkS DARKS
-                    Dark saturation scale. Default 0.
-###### -dv DARKV, --darkV DARKV
-                    Dark value scale.
-###### -t THRESHOLD, --threshold THRESHOLD
-                    Star brightness threshold (0-1). Only stars with a brightness above the threshold will be detected.
-###### -r RADIUS, --radius RADIUS
-                    Star ID search radius in pixels. The raltive positions of neighbours within the radius is used to identify individual stars over a set of images.
-###### -nb NOISE_BLUR, --noise_blur NOISE_BLUR
-                    Star detection pre-blur. Blur can be applied to the image to reduce the chances of hot pixels being detected as stars.
+#### -d DARKS_PATH, --darks_path DARKS_PATH
+Path to directory containing dark frames. Darks are used to subtract consistent noise patterns and banding from images. CAPTURING DARKS: Make sure
+the camera has the same ISO, shutter speed, and temperature as when the lights were captured. Block all light from reaching the sensor, and capture
+20-100 images. Astropic averages the dark frames to create a master dark that contains any banding and consistent noise patterns the sensor creates
+#### -dh DARKH, --darkH DARKH
+Dark hue shift.
+#### -ds DARKS, --darkS DARKS
+Dark saturation scale. Default 0.
+#### -dv DARKV, --darkV DARKV
+Dark value scale.
+#### -t THRESHOLD, --threshold THRESHOLD
+Star brightness threshold (0-1). Only stars with a brightness above the threshold will be detected.
+#### -r RADIUS, --radius RADIUS
+Star ID search radius in pixels. The raltive positions of neighbours within the radius is used to identify individual stars over a set of images.
+#### -nb NOISE_BLUR, --noise_blur NOISE_BLUR
+Star detection pre-blur. Blur can be applied to the image to reduce the chances of hot pixels being detected as stars.
