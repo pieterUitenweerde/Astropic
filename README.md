@@ -28,40 +28,11 @@ Raw files from the camera must be converted to tiffs as the tool does not suppor
 ###### Step 5: Run Astropic on the image set:
 When run, Astropic will output debugging info to the terminal. The dark frames will be loaded first, after which the reference frame will be processed and then the lights. Make sure that the settings used results in the program detecting >50 stars in the reference image, and identifies at least 20. Once the lights are being processed, make sure that >4 matches are found between the lights and the ref. If too many images are skipped, tweak the settings. If too few stars are detected or identified in the reference image, the program will error and terminate.
 
-Manual:
-
-Usage:
-Astropic [-h] [-d DARKS_PATH] [-dh DARKH] [-ds DARKS] [-dv DARKV] [-t THRESHOLD] [-r RADIUS] [-nb NOISE_BLUR] ref lights_path output_path
-
-positional arguments:
-  ref                   Reference image to determine framing of output.
-  lights_path           Path to directory containing light frames.
-  output_path           Path to output file, including .tif file extension.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -d DARKS_PATH, --darks_path DARKS_PATH
-                        Path to directory containing dark frames. Darks are used to subtract consistent noise patterns and banding from images. CAPTURING DARKS: Make sure
-                        the camera has the same ISO, shutter speed, and temperature as when the lights were captured. Block all light from reaching the sensor, and capture
-                        20-100 images. Astropic averages the dark frames to create a master dark that contains any banding and consistent noise patterns the sensor creates
-  -dh DARKH, --darkH DARKH
-                        Dark hue shift.
-  -ds DARKS, --darkS DARKS
-                        Dark saturation scale. Default 0.
-  -dv DARKV, --darkV DARKV
-                        Dark value scale.
-  -t THRESHOLD, --threshold THRESHOLD
-                        Star brightness threshold (0-1). Only stars with a brightness above the threshold will be detected.
-  -r RADIUS, --radius RADIUS
-                        Star ID search radius in pixels. The raltive positions of neighbours within the radius is used to identify individual stars over a set of images.
-  -nb NOISE_BLUR, --noise_blur NOISE_BLUR
-                        Star detection pre-blur. Blur can be applied to the image to reduce the chances of hot pixels being detected as stars.
-
 ###### Step 6: Do any desired post-processing on the image:
 Using an image editing tool like photoshop or lightroom, adjust curves, contrast, levels, and exposure as desired.
 
 #### Implementation details:
-###### Algorithms:
+#### Algorithms:
 
 Star detection:
 
@@ -83,19 +54,50 @@ Stacking of images:
 
 The images are simply averaged to blend them together. Using NumPy makes averaging arrays simple.
 
-###### Program logic:
+#### Program logic:
 
 The program makes use of some object oriented concepts. All images are loaded into the "Astropic" class, which contains all methods needed to process images. Useful data such as detected stars are saved in the class. Two additional classes, "DetectedStars" and "Stars" are also used. "DetectedStars" stores all the stars detected in an image, while "Star" stores specific data such as a star's ID.
 
 Loops are used to process all the images loaded, with the image stack being built progressively.
 
-###### Files:
+#### Files:
 
-main.py
+###### main.py
 Holds the primary logic for processing all loaded images, as well as the Astropic class.
 
-star_detection.py
+###### star_detection.py
 Contains the ccl algorithm to detect stars in an image, as well as helper functions.
 
-star_identification.py
+###### star_identification.py
 All algortihms related to identifying specific stars.
+
+
+## Manual:
+
+###### Usage:
+Astropic [-h] [-d DARKS_PATH] [-dh DARKH] [-ds DARKS] [-dv DARKV] [-t THRESHOLD] [-r RADIUS] [-nb NOISE_BLUR]ref lights_path output_path
+
+###### positional arguments:
+ref                   Reference image to determine framing of output.
+lights_path           Path to directory containing light frames.
+output_path           Path to output file, including .tif file extension.
+
+###### optional arguments:
+###### -h, --help            
+show this help message and exit
+###### -d DARKS_PATH, --darks_path DARKS_PATH
+                    Path to directory containing dark frames. Darks are used to subtract consistent noise patterns and banding from images. CAPTURING DARKS: Make sure
+                    the camera has the same ISO, shutter speed, and temperature as when the lights were captured. Block all light from reaching the sensor, and capture
+                    20-100 images. Astropic averages the dark frames to create a master dark that contains any banding and consistent noise patterns the sensor creates
+###### -dh DARKH, --darkH DARKH
+                    Dark hue shift.
+###### -ds DARKS, --darkS DARKS
+                    Dark saturation scale. Default 0.
+###### -dv DARKV, --darkV DARKV
+                    Dark value scale.
+###### -t THRESHOLD, --threshold THRESHOLD
+                    Star brightness threshold (0-1). Only stars with a brightness above the threshold will be detected.
+###### -r RADIUS, --radius RADIUS
+                    Star ID search radius in pixels. The raltive positions of neighbours within the radius is used to identify individual stars over a set of images.
+###### -nb NOISE_BLUR, --noise_blur NOISE_BLUR
+                    Star detection pre-blur. Blur can be applied to the image to reduce the chances of hot pixels being detected as stars.
