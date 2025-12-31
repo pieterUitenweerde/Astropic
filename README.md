@@ -1,10 +1,10 @@
 # Astropic
-#### Video Demo:  <URL HERE>
+#### Video Demo:  https://youtu.be/7e8FmYF3QbA
 #### Description:
 Astropic is an astrophotography image processing tool that allows users to capture images of nebulae, galaxies, comets, and other deep sky objects using standard photography equipment.
 
 #### The problem Astropic solves:
-Photographing deep sky objects such as nebulae and galaxies comes with a few major challenges. The main one is that these objects are dim. Due to this, photographers must set the camera's sensor to high sensitivities, resulting in a significant amount of noise. The noise can often be so severe that it hides the underlying data. Astropic, like other astrophotography image stacking tools, improves the signal-to-noise ratio by taking many noisy images and blending (averaging) them together. Noise is random, so gets averaged away, but the underlying signal (in this case light from deep sky objects) is constant, and thus becomes stronger relative to the noise when averaged. The signal-to-noise ratio improves by the square root of the number of sub-exposures captured.
+Photographing deep sky objects such as nebulae and galaxies comes with a few major challenges. The main one is that these objects are dim. Due to this, photographers must set the camera's sensor to high sensitivities, resulting in a significant amount of noise. The noise can often be so severe that it hides the underlying data. Astropic, like other astrophotography image stacking tools, improves the signal-to-noise ratio by taking many noisy images and blending (averaging) them together. Noise is random, so it gets averaged away, but the underlying signal (in this case light from deep sky objects) is constant, and thus becomes stronger relative to the noise when averaged. The signal-to-noise ratio improves by the square root of the number of sub-exposures captured.
 
 Another major challenge with astrophotography is the rotation of the earth. Without expensive star tracking equipment the sky is constantly moving relative to the camera. For this reason, a set of images of the night sky cannot simply be averaged, they must be aligned prior to averaging. Astropic takes care of this issue by identifying stars over a set of sub-exposures, and uses those stars as reference points to transform all the sub-exposures in a set onto a chosen reference frame. The stars are identified based on the relative positions of their neighbours within a set radius.
 
