@@ -24,6 +24,7 @@ def neighbour_based_id(star, AstroPic, radius):
     """Generate an ID for a star based on the relative positions of its neighbours.
 
     Args:
+        star(list[float]): XY coordinates of the star.
         AstroPic(Astropic): Image.
         radius(int): Neighbour search radius.
     
@@ -46,8 +47,8 @@ def neighbour_based_id(star, AstroPic, radius):
     # Search for neighbours in square first to reduce calculations
     # Loop over square of pixels with width r * 2
     # Check if rounding is optimal
-    for y in range(round(star[0]) - radius, round(star[0]) + radius + 1): # Loop over the vertical pixels
-        for x in range(round(star[1]) - radius, round(star[1]) + radius + 1): # Loop over the horizontal pixels
+    for y in range(star_y - radius, star_y + radius + 1): # Loop over the vertical pixels
+        for x in range(star_x - radius, star_x + radius + 1): # Loop over the horizontal pixels
             # Do not include self in ID
             if x == star_x and y == star_y:
                 continue
