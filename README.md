@@ -1,5 +1,4 @@
 # Astropic
-#### Video Demo:  https://youtu.be/7e8FmYF3QbA
 #### Description:
 Astropic is an astrophotography image processing tool that allows users to capture images of nebulae, galaxies, comets, and other deep sky objects using standard photography equipment.
 
